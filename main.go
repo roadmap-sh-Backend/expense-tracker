@@ -32,6 +32,7 @@ func main() {
 	switch feat {
 	case "add":
 		addCmd := flag.NewFlagSet("add", flag.ExitOnError)
+		category := addCmd.String("category", "", "A category of expenses")
 		description := addCmd.String("description", "", "A description of expenses")
 		amount := addCmd.Int64("amount", 0, "The amount of expenses")
 
@@ -41,6 +42,7 @@ func main() {
 		}
 
 		expenses, err := CreateExpense(FILE_NAME, UpsertExpense{
+			Category:    *category,
 			Description: *description,
 			Amount:      *amount,
 		})
@@ -107,20 +109,44 @@ func main() {
 			)
 		}
 	case "list":
+		lsCmd := flag.NewFlagSet("list", flag.ExitOnError)
+		category := lsCmd.String("category", "", "A category of expense")
+
+		err = lsCmd.Parse(args[3:])
+		if err != nil {
+			log.Fatalf("Failed to parse list command flags: %v", err)
+		}
+
 		expenses, err := GetExpenses(FILE_NAME)
 		if err != nil {
 			log.Fatalf("Failed to retrieve all expenses: %v", err)
 		}
 
-		slog.Info("Expense list")
-		for _, expense := range expenses.Expenses {
-			slog.Info("Expense",
-				"ID", expense.ID,
-				"Description", expense.Description,
-				"Amount", expense.Amount,
-				"CreatedAt", expense.CreatedAt,
-				"UpdatedAt", expense.UpdatedAt,
-			)
+		if category != nil {
+			slog.Info("Expense list",
+				"Category", *category)
+			for _, expense := range expenses.Expenses {
+				if expense.Category == *category {
+					slog.Info("Expense",
+						"ID", expense.ID,
+						"Description", expense.Description,
+						"Amount", expense.Amount,
+						"CreatedAt", expense.CreatedAt,
+						"UpdatedAt", expense.UpdatedAt,
+					)
+				}
+			}
+		} else {
+			slog.Info("Expense list")
+			for _, expense := range expenses.Expenses {
+				slog.Info("Expense",
+					"ID", expense.ID,
+					"Description", expense.Description,
+					"Amount", expense.Amount,
+					"CreatedAt", expense.CreatedAt,
+					"UpdatedAt", expense.UpdatedAt,
+				)
+			}
 		}
 	default:
 		log.Fatalf("UNKNOWN COMMAND")
@@ -177,8 +203,14 @@ func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
 		return nil, err
 	}
 
+	currID := 0
+	if len(expenses.Expenses) > 0 {
+		currID = expenses.Expenses[len(expenses.Expenses)-1].ID
+	}
+
 	expense := Expense{
-		ID:          expenses.Expenses[len(expenses.Expenses)-1].ID + 1,
+		ID:          currID + 1,
+		Category:    payload.Category,
 		Description: payload.Description,
 		Amount:      payload.Amount,
 		CreatedAt:   time.Now(),

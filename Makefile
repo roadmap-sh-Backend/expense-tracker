@@ -1,17 +1,28 @@
 cmd-add:
-	@if [ -z "$(description)" ] || [ -z "$(amount)"]; then \
-		echo "Error: description and amount is required. Usage: make cmd-add description=<string> amount=<number>"; \
+	@if [ -z "$(description)" ] || [ -z "$(amount)"] || [ -z "$(category)"]; then \
+		echo "Error: description, amount, and category are required. Usage: make cmd-add category=<string> description=<string> amount=<number>"; \
 		exit 1; \
 	fi
-	go run . expense-tracker add --description $(description) --amount $(amount)
+	go run . expense-tracker add --category $(category) --description $(description) --amount $(amount)
+
+cmd-ls-all:
+	go run . expense-tracker list
 
 cmd-ls:
-	go run . expense-tracker list
+	@if [ -z "$(category)" ]; then \
+		echo "Error: category is required. Usage: make cmd-ls category=<string>"; \
+		exit 1; \
+	fi
+	go run . expense-tracker list --category $(category)
 
 cmd-summ-all:
 	go run . expense-tracker summary
 
 cmd-summ:
+	@if [ -z "$(month)" ]; then \
+		echo "Error: month is required. Usage: make cmd-summ month=<number>"; \
+		exit 1; \
+	fi
 	go run . expense-tracker summary --month $(month)
 
 cmd-del:

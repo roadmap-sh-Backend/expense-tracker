@@ -8,6 +8,7 @@ type Expenses struct {
 
 type Expense struct {
 	ID          int       `json:"id"`
+	Category    string    `json:"category"`
 	Description string    `json:"description"`
 	Amount      int64     `json:"amount"`
 	CreatedAt   time.Time `json:"createdAt"`
@@ -15,6 +16,7 @@ type Expense struct {
 }
 
 type UpsertExpense struct {
+	Category    string `json:"category"`
 	Description string `json:"description"`
 	Amount      int64  `json:"amount"`
 }
