@@ -167,7 +167,7 @@ func main() {
 			log.Fatalf("Failed to retrieve all expenses: %v", err)
 		}
 
-		if category != nil {
+		if *category != "" {
 			slog.Info("Expense list",
 				"Category", *category)
 			for _, expense := range personExpenses.Expenses.Expenses {
