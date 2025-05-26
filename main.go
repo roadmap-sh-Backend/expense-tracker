@@ -42,13 +42,6 @@ func main() {
 			log.Fatalf("Failed to parse add command flags: %v", err)
 		}
 
-		msg, err := CheckBudgetUsage(FILE_NAME)
-		if err != nil {
-			log.Fatalf("Failed while checking current budget usage: %v", err)
-		} else if msg != "" {
-			log.Println(msg)
-		}
-
 		personExpenses, err := InsertExpense(FILE_NAME, UpsertExpense{
 			Category:    *category,
 			Description: *description,
@@ -56,6 +49,13 @@ func main() {
 		})
 		if err != nil {
 			log.Fatalf("Failed adding expense: %v", err)
+		}
+
+		msg, err := CheckBudgetUsage(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed while checking current budget usage: %v", err)
+		} else if msg != "" {
+			log.Println(msg)
 		}
 
 		slog.Info("Result",
@@ -77,14 +77,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed retrieving expense by id: %v", err)
 		}
-
-		msg, err := CheckBudgetUsage(FILE_NAME)
-		if err != nil {
-			log.Fatalf("Failed while checking current budget usage: %v", err)
-		} else if msg != "" {
-			log.Println(msg)
-		}
-
 		expenses, err := UpdateExpense(FILE_NAME, expense, UpsertExpense{
 			Category:    *category,
 			Description: *description,
@@ -92,6 +84,13 @@ func main() {
 		})
 		if err != nil {
 			log.Fatalf("Failed updated expense: %v", err)
+		}
+
+		msg, err := CheckBudgetUsage(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed while checking current budget usage: %v", err)
+		} else if msg != "" {
+			log.Println(msg)
 		}
 
 		slog.Info("Result",
