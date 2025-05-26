@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -85,7 +86,9 @@ func main() {
 		}
 
 		total := int64(0)
-		if *month == 0 {
+		if *month < 0 {
+			log.Fatalf("Month number cannot be negative")
+		} else if *month == 0 {
 			for _, expense := range expenses.Expenses {
 				if *month == 0 {
 					total += expense.Amount
@@ -198,6 +201,10 @@ func GetExpenses(fileName string) (*Expenses, error) {
 }
 
 func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
+	if payload.Amount < 0 {
+		return nil, fmt.Errorf("Amount cannot be negative")
+	}
+
 	expenses, err := GetExpenses(fileName)
 	if err != nil {
 		return nil, err
@@ -235,10 +242,17 @@ func DeleteExpense(fileName string, id *int) (*Expenses, error) {
 	newExpenses := Expenses{
 		Expenses: []Expense{},
 	}
+	found := false
 	for _, expense := range expenses.Expenses {
 		if expense.ID != *id {
 			newExpenses.Expenses = append(newExpenses.Expenses, expense)
+		} else {
+			found = true
 		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("Expense with id: %d is not found", *id)
 	}
 
 	err = WriteExpense(fileName, &newExpenses)
