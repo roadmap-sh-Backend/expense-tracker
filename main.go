@@ -42,7 +42,14 @@ func main() {
 			log.Fatalf("Failed to parse add command flags: %v", err)
 		}
 
-		expenses, err := CreateExpense(FILE_NAME, UpsertExpense{
+		msg, err := CheckBudgetUsage(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed while checking current budget usage: %v", err)
+		} else if msg != "" {
+			log.Println(msg)
+		}
+
+		personExpenses, err := InsertExpense(FILE_NAME, UpsertExpense{
 			Category:    *category,
 			Description: *description,
 			Amount:      *amount,
@@ -53,7 +60,7 @@ func main() {
 
 		slog.Info("Result",
 			"status", "Successfully added expense data",
-			"expenses", expenses)
+			"expenses", personExpenses)
 	case "update":
 		updateCmd := flag.NewFlagSet("update", flag.ExitOnError)
 		id := updateCmd.Int("id", 0, "An id of expense")
@@ -69,6 +76,13 @@ func main() {
 		expense, err := GetExpenseByID(FILE_NAME, *id)
 		if err != nil {
 			log.Fatalf("Failed retrieving expense by id: %v", err)
+		}
+
+		msg, err := CheckBudgetUsage(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed while checking current budget usage: %v", err)
+		} else if msg != "" {
+			log.Println(msg)
 		}
 
 		expenses, err := UpdateExpense(FILE_NAME, expense, UpsertExpense{
@@ -109,7 +123,7 @@ func main() {
 			log.Fatalf("Failed to parse summary command flags: %v", err)
 		}
 
-		expenses, err := GetExpenses(FILE_NAME)
+		personExpenses, err := GetPersonExpense(FILE_NAME)
 		if err != nil {
 			log.Fatalf("Failed to retrieve all expenses: %v", err)
 		}
@@ -118,7 +132,7 @@ func main() {
 		if *month < 0 {
 			log.Fatalf("Month number cannot be negative")
 		} else if *month == 0 {
-			for _, expense := range expenses.Expenses {
+			for _, expense := range personExpenses.Expenses.Expenses {
 				if *month == 0 {
 					total += expense.Amount
 				}
@@ -129,7 +143,7 @@ func main() {
 			)
 		} else {
 			currYear := time.Now().Year()
-			for _, expense := range expenses.Expenses {
+			for _, expense := range personExpenses.Expenses.Expenses {
 				if *month == int(expense.CreatedAt.Month()) && currYear == expense.CreatedAt.Year() {
 					total += expense.Amount
 				}
@@ -149,7 +163,7 @@ func main() {
 			log.Fatalf("Failed to parse list command flags: %v", err)
 		}
 
-		expenses, err := GetExpenses(FILE_NAME)
+		personExpenses, err := GetPersonExpense(FILE_NAME)
 		if err != nil {
 			log.Fatalf("Failed to retrieve all expenses: %v", err)
 		}
@@ -157,7 +171,7 @@ func main() {
 		if category != nil {
 			slog.Info("Expense list",
 				"Category", *category)
-			for _, expense := range expenses.Expenses {
+			for _, expense := range personExpenses.Expenses.Expenses {
 				if expense.Category == *category {
 					slog.Info("Expense",
 						"ID", expense.ID,
@@ -170,7 +184,7 @@ func main() {
 			}
 		} else {
 			slog.Info("Expense list")
-			for _, expense := range expenses.Expenses {
+			for _, expense := range personExpenses.Expenses.Expenses {
 				slog.Info("Expense",
 					"ID", expense.ID,
 					"Description", expense.Description,
@@ -180,6 +194,33 @@ func main() {
 				)
 			}
 		}
+	case "set-budget":
+		setBudgetCmd := flag.NewFlagSet("set-budget", flag.ExitOnError)
+		amount := setBudgetCmd.Float64("amount", 0.0, "A budget limit amount")
+		month := setBudgetCmd.Int("month", int(time.Now().Month()), "The month for specifying budget limit")
+		year := setBudgetCmd.Int("year", int(time.Now().Year()), "The year for specifying budget limit")
+
+		err = setBudgetCmd.Parse(args[3:])
+		if err != nil {
+			log.Fatalf("Failed to parse set-budget command flags: %v", err)
+		}
+
+		personExpense, err := GetPersonExpense(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed to retrieve all expenses: %v", err)
+		}
+
+		personExpense.Budget = *amount
+		err = WriteExpense(FILE_NAME, personExpense)
+		if err != nil {
+			log.Fatalf("Failed updating budget limit on month: [%s]. Error: %v", time.Month(*month), err)
+		}
+
+		slog.Info("Successfully set budget limit",
+			"Month", time.Month(*month),
+			"Year", *year,
+			"Amount", *amount,
+		)
 	default:
 		log.Fatalf("UNKNOWN COMMAND")
 	}
@@ -191,15 +232,17 @@ func initializeStorage(name string) error {
 		return nil
 	}
 
+	strData := fmt.Sprint(`{"budget": 0, "expenses": []}`)
+
 	if os.IsNotExist(err) {
-		return os.WriteFile(name, []byte(`{"expenses": []}`), 0644)
+		return os.WriteFile(name, []byte(strData), 0644)
 	}
 
 	return err
 }
 
-func WriteExpense(fileName string, expenses *Expenses) error {
-	jsonData, err := json.MarshalIndent(expenses, "", "\t")
+func WriteExpense(fileName string, data *PersonExpense) error {
+	jsonData, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		log.Println("Error marshalling", err)
 		return err
@@ -214,13 +257,13 @@ func WriteExpense(fileName string, expenses *Expenses) error {
 	return nil
 }
 
-func GetExpenses(fileName string) (*Expenses, error) {
+func GetPersonExpense(fileName string) (*PersonExpense, error) {
 	byteData, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}
 
-	var expenses Expenses
+	var expenses PersonExpense
 	err = json.Unmarshal(byteData, &expenses)
 	if err != nil {
 		return nil, err
@@ -250,19 +293,19 @@ func GetExpenseByID(fileName string, id int) (*Expense, error) {
 	return nil, fmt.Errorf("Expense with id: %d is not found", id)
 }
 
-func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
+func InsertExpense(fileName string, payload UpsertExpense) (*PersonExpense, error) {
 	if payload.Amount < 0 {
 		return nil, fmt.Errorf("Amount cannot be negative")
 	}
 
-	expenses, err := GetExpenses(fileName)
+	personExpense, err := GetPersonExpense(fileName)
 	if err != nil {
 		return nil, err
 	}
 
 	currID := 0
-	if len(expenses.Expenses) > 0 {
-		currID = expenses.Expenses[len(expenses.Expenses)-1].ID
+	if len(personExpense.Expenses.Expenses) > 0 {
+		currID = personExpense.Expenses.Expenses[len(personExpense.Expenses.Expenses)-1].ID
 	}
 
 	expense := Expense{
@@ -274,21 +317,21 @@ func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
 		UpdatedAt:   time.Now(),
 	}
 
-	expenses.Expenses = append(expenses.Expenses, expense)
-	err = WriteExpense(fileName, expenses)
+	personExpense.Expenses.Expenses = append(personExpense.Expenses.Expenses, expense)
+	err = WriteExpense(fileName, personExpense)
 	if err != nil {
 		return nil, err
 	}
 
-	return expenses, nil
+	return personExpense, nil
 }
 
-func UpdateExpense(fileName string, expense *Expense, payload UpsertExpense) (*Expenses, error) {
+func UpdateExpense(fileName string, expense *Expense, payload UpsertExpense) (*PersonExpense, error) {
 	if payload.Amount < 0 {
 		return nil, fmt.Errorf("Amount cannot be negative")
 	}
 
-	expenses, err := GetExpenses(fileName)
+	personExpense, err := GetPersonExpense(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -302,23 +345,22 @@ func UpdateExpense(fileName string, expense *Expense, payload UpsertExpense) (*E
 		UpdatedAt:   time.Now(),
 	}
 
-	expenses, err = DeleteExpense(fileName, &expense.ID)
+	personExpense, err = DeleteExpense(fileName, &expense.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	expenses.Expenses = append(expenses.Expenses, *expense)
-
-	err = WriteExpense(fileName, expenses)
+	personExpense.Expenses.Expenses = append(personExpense.Expenses.Expenses, *expense)
+	err = WriteExpense(fileName, personExpense)
 	if err != nil {
 		return nil, err
 	}
 
-	return expenses, nil
+	return personExpense, nil
 }
 
-func DeleteExpense(fileName string, id *int) (*Expenses, error) {
-	expenses, err := GetExpenses(fileName)
+func DeleteExpense(fileName string, id *int) (*PersonExpense, error) {
+	personExpense, err := GetPersonExpense(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +369,7 @@ func DeleteExpense(fileName string, id *int) (*Expenses, error) {
 		Expenses: []Expense{},
 	}
 	found := false
-	for _, expense := range expenses.Expenses {
+	for _, expense := range personExpense.Expenses.Expenses {
 		if expense.ID != *id {
 			newExpenses.Expenses = append(newExpenses.Expenses, expense)
 		} else {
@@ -339,10 +381,31 @@ func DeleteExpense(fileName string, id *int) (*Expenses, error) {
 		return nil, fmt.Errorf("Expense with id: %d is not found", *id)
 	}
 
-	err = WriteExpense(fileName, &newExpenses)
+	personExpense.Expenses = newExpenses
+	err = WriteExpense(fileName, personExpense)
 	if err != nil {
 		return nil, err
 	}
 
-	return &newExpenses, nil
+	return personExpense, nil
+}
+
+func CheckBudgetUsage(fileName string) (string, error) {
+	personExpense, err := GetPersonExpense(fileName)
+	if err != nil {
+		return "", err
+	}
+
+	amountSum := 0.0
+	for _, expense := range personExpense.Expenses.Expenses {
+		amountSum += float64(expense.Amount)
+	}
+
+	if amountSum >= personExpense.Budget {
+		return fmt.Sprintf(
+			"Your current summarize expenses for this month: [%s] is exceeding your budget!!!",
+			time.Month(time.Now().Month())), nil
+	}
+
+	return "", nil
 }

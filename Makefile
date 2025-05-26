@@ -38,3 +38,10 @@ cmd-del:
 		exit 1; \
 	fi
 	go run . expense-tracker delete --id $(id)
+
+cmd-set-budget:
+	@if [ -z "$(month)" ] || [ -z "$(amount)" ]; then \
+		echo "Error: month and amount are required. Usage: make cmd-set-budget month=<number> amount=<number>"; \
+		exit 1; \
+	fi
+	go run . expense-tracker set-budget --month $(month) --amount $(amount)

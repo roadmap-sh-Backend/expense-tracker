@@ -1,6 +1,13 @@
 package main
 
-import "time"
+import (
+	"time"
+)
+
+type PersonExpense struct {
+	Budget float64 `json:"budget"`
+	Expenses
+}
 
 type Expenses struct {
 	Expenses []Expense `json:"expenses"`
