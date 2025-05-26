@@ -54,6 +54,35 @@ func main() {
 		slog.Info("Result",
 			"status", "Successfully added expense data",
 			"expenses", expenses)
+	case "update":
+		updateCmd := flag.NewFlagSet("update", flag.ExitOnError)
+		id := updateCmd.Int("id", 0, "An id of expense")
+		category := updateCmd.String("category", "", "A category of expenses")
+		description := updateCmd.String("description", "", "A description of expenses")
+		amount := updateCmd.Int64("amount", 0, "The amount of expenses")
+
+		err = updateCmd.Parse(args[3:])
+		if err != nil {
+			log.Fatalf("Failed to parse update command flags: %v", err)
+		}
+
+		expense, err := GetExpenseByID(FILE_NAME, *id)
+		if err != nil {
+			log.Fatalf("Failed retrieving expense by id: %v", err)
+		}
+
+		expenses, err := UpdateExpense(FILE_NAME, expense, UpsertExpense{
+			Category:    *category,
+			Description: *description,
+			Amount:      *amount,
+		})
+		if err != nil {
+			log.Fatalf("Failed updated expense: %v", err)
+		}
+
+		slog.Info("Result",
+			"status", "Successfully updated expense data",
+			"expenses", expenses)
 	case "delete":
 		delCmd := flag.NewFlagSet("delete", flag.ExitOnError)
 		id := delCmd.Int("id", 0, "An id of expense")
@@ -200,6 +229,27 @@ func GetExpenses(fileName string) (*Expenses, error) {
 	return &expenses, nil
 }
 
+func GetExpenseByID(fileName string, id int) (*Expense, error) {
+	byteData, err := os.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var expenses Expenses
+	err = json.Unmarshal(byteData, &expenses)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, expense := range expenses.Expenses {
+		if expense.ID == id {
+			return &expense, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Expense with id: %d is not found", id)
+}
+
 func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
 	if payload.Amount < 0 {
 		return nil, fmt.Errorf("Amount cannot be negative")
@@ -225,6 +275,40 @@ func CreateExpense(fileName string, payload UpsertExpense) (*Expenses, error) {
 	}
 
 	expenses.Expenses = append(expenses.Expenses, expense)
+	err = WriteExpense(fileName, expenses)
+	if err != nil {
+		return nil, err
+	}
+
+	return expenses, nil
+}
+
+func UpdateExpense(fileName string, expense *Expense, payload UpsertExpense) (*Expenses, error) {
+	if payload.Amount < 0 {
+		return nil, fmt.Errorf("Amount cannot be negative")
+	}
+
+	expenses, err := GetExpenses(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	expense = &Expense{
+		ID:          expense.ID,
+		Category:    payload.Category,
+		Description: payload.Description,
+		Amount:      payload.Amount,
+		CreatedAt:   expense.CreatedAt,
+		UpdatedAt:   time.Now(),
+	}
+
+	expenses, err = DeleteExpense(fileName, &expense.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	expenses.Expenses = append(expenses.Expenses, *expense)
+
 	err = WriteExpense(fileName, expenses)
 	if err != nil {
 		return nil, err

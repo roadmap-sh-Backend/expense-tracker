@@ -5,6 +5,13 @@ cmd-add:
 	fi
 	go run . expense-tracker add --category $(category) --description $(description) --amount $(amount)
 
+cmd-update:
+	@if [ -z "$(id)" ] || [ -z "$(description)" ] || [ -z "$(amount)" ] || [ -z "$(category)" ]; then \
+		echo "Error: id, description, amount, and category are required. Usage: make cmd-update id=<number> category=<string> description=<string> amount=<number>"; \
+		exit 1; \
+	fi
+	go run . expense-tracker update --id $(id) --category $(category) --description $(description) --amount $(amount)
+
 cmd-ls-all:
 	go run . expense-tracker list
 
