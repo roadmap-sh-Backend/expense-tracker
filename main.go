@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -220,6 +222,51 @@ func main() {
 			"Year", *year,
 			"Amount", *amount,
 		)
+	case "export":
+		exportCmd := flag.NewFlagSet("export", flag.ExitOnError)
+
+		err = exportCmd.Parse(args[3:])
+		if err != nil {
+			log.Fatalf("Failed to parse export command flags: %v", err)
+		}
+
+		personExpense, err := GetPersonExpense(FILE_NAME)
+		if err != nil {
+			log.Fatalf("Failed to retrieve all expenses: %v", err)
+		}
+
+		data := [][]string{}
+		data = append(data, []string{
+			"No", "Expense Id", "Category", "Amount", "Description", "Created At", "Updated At",
+		})
+		for i, v := range personExpense.Expenses.Expenses {
+			data = append(data, []string{
+				strconv.Itoa(i),
+				strconv.Itoa(v.ID),
+				v.Category,
+				strconv.Itoa(int(v.Amount)),
+				v.Description,
+				v.CreatedAt.String(),
+				v.UpdatedAt.String(),
+			})
+		}
+
+		filename := fmt.Sprintf("exports/Expense-%s.csv", time.Now().Format(time.DateOnly))
+		file, err := os.Create(filename)
+		if err != nil {
+			log.Fatalf("Error while exporting data")
+		}
+		defer file.Close()
+
+		writer := csv.NewWriter(file)
+		defer writer.Flush()
+		for _, row := range data {
+			err := writer.Write(row)
+			if err != nil {
+				os.Remove(filename)
+				log.Fatalf("Error while exporting data")
+			}
+		}
 	default:
 		log.Fatalf("UNKNOWN COMMAND")
 	}
@@ -231,7 +278,7 @@ func initializeStorage(name string) error {
 		return nil
 	}
 
-	strData := fmt.Sprint(`{"budget": 0, "expenses": []}`)
+	strData := `{"budget": 0, "expenses": []}`
 
 	if os.IsNotExist(err) {
 		return os.WriteFile(name, []byte(strData), 0644)

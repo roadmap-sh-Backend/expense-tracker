@@ -45,3 +45,6 @@ cmd-set-budget:
 		exit 1; \
 	fi
 	go run . expense-tracker set-budget --month $(month) --amount $(amount)
+
+cmd-export:
+	go run . expense-tracker export
