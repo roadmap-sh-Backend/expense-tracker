@@ -19,5 +19,6 @@ I just separate the codes by it's meaning like `types.go` for the structs declar
 6. Users can view a summary of expenses for a specific month (of current year). ✅
 7. Add expense categories and allow users to filter expenses by category. ✅
 8. Allow users to set a budget for each month and show a warning when the user exceeds the budget. ✅
-9. Allow users to export expenses to a CSV file. [TODO]
+9. Allow users to export expenses to a CSV file. ✅
+6 
 
