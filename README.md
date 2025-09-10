@@ -20,5 +20,4 @@ I just separate the codes by it's meaning like `types.go` for the structs declar
 7. Add expense categories and allow users to filter expenses by category. ✅
 8. Allow users to set a budget for each month and show a warning when the user exceeds the budget. ✅
 9. Allow users to export expenses to a CSV file. ✅
-6 
 
